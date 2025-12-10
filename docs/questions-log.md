@@ -10,4 +10,8 @@ Chronological notes of user questions and answers to aid future automation/scrip
 - Droplet package prompts: ok to restart `unattended-upgrades.service`; for Docker GPG key prompt, keep existing key (answer `n` or cancel) and continue install.
 - Docker install steps: documented apt repo add and install commands for Docker CE + compose plugin, group membership, and verification.
 - Deploy key lessons: use a droplet-specific SSH key (`~/.ssh/id_ed25519_n8n`), add as GitHub deploy key (allow write if pushing), set `~/.ssh/config` with `IdentitiesOnly yes`, chmod 600 on key/config, verify with `ssh -i ~/.ssh/id_ed25519_n8n -o IdentitiesOnly=yes -T git@github.com`, and clone with `GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519_n8n -o IdentitiesOnly=yes' git clone git@github.com:mdc159/n8n-hosted.git /opt/n8n`.
+- Auth + env quirks:
+  - When hashing passwords containing `!`, wrap in single quotes to avoid shell expansion: `caddy hash-password --plaintext 'Sturdy-N8n!93^Caddy'`.
+  - In `.env`, escape bcrypt hashes with `$$` so docker-compose doesn’t treat `$` as env vars (e.g., `BASIC_AUTH_HASH=$$2a$$14$$...`).
+  - Ensure Caddy receives BASIC_AUTH_USER/HASH via compose env so auth works; after changes, recreate the stack.
 

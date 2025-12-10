@@ -7,6 +7,9 @@ Step-by-step to deploy n8n behind Caddy TLS on `n8n.pimpshizzle.com`, with a loc
 - Ubuntu CPU droplet (e.g., 2 vCPU / 4 GB). Recommended OS: Ubuntu 22.04 LTS (Jammy). 24.04 LTS is fine if you prefer latest, but 22.04 has the broadest Docker/docs support.
 - SSH access as a sudo-capable user.
 - GitHub access: prefer SSH deploy key on the droplet so it can `git pull`/`git push` to `mdc159/n8n-hosted` without PATs.
+- Shell/env tips:
+  - When hashing passwords with `!` or other special chars, wrap in single quotes: `caddy hash-password --plaintext 'Sturdy-N8n!93^Caddy'`.
+  - In `.env`, escape bcrypt hashes with double dollars so compose doesn’t treat `$` as vars: `BASIC_AUTH_HASH=$$2a$$14$$...`.
 
 ### Set up droplet deploy key (SSH)
 On the droplet (root):
