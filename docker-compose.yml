@@ -1,5 +1,3 @@
-version: "3.9"
-
 name: n8n-stack
 
 services:
@@ -11,6 +9,8 @@ services:
       - "443:443"
     environment:
       - CADDY_EMAIL=${CADDY_EMAIL}
+      - BASIC_AUTH_USER=${BASIC_AUTH_USER}
+      - BASIC_AUTH_HASH=${BASIC_AUTH_HASH}
     volumes:
       - caddy_data:/data
       - caddy_config:/config
