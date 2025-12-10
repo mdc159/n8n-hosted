@@ -1,0 +1,27 @@
+{
+	email {$CADDY_EMAIL}
+}
+
+n8n.pimpshizzle.com {
+	encode gzip zstd
+
+	# HTTP -> HTTPS redirect
+	@http {
+		protocol http
+	}
+	handle @http {
+		redir https://{host}{uri} permanent
+	}
+
+	# Basic auth in front of n8n (set BASIC_AUTH_USER/HASH in env)
+	basicauth {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	}
+
+	reverse_proxy n8n:5678 {
+		header_up Host {host}
+		header_up X-Forwarded-Proto https
+		header_up X-Real-IP {remote_host}
+	}
+}
+

@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "docker",
+      "args": [
+        "exec",
+        "-i",
+        "n8n-stack-mcp-1",
+        "node",
+        "/app/dist/mcp/index.js"
+      ],
+      "env": {
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "error",
+        "DISABLE_CONSOLE_OUTPUT": "true",
+        "N8N_MCP_TELEMETRY_DISABLED": "true"
+      }
+    }
+  }
+}
+

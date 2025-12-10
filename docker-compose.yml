@@ -1,0 +1,68 @@
+version: "3.9"
+
+name: n8n-stack
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - CADDY_EMAIL=${CADDY_EMAIL}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - n8n
+    networks:
+      - n8n_net
+
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_USER_MANAGEMENT_JWT_SECRET=${N8N_USER_MANAGEMENT_JWT_SECRET}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - N8N_SECURE_COOKIE=true
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - NODE_ENV=production
+      - TZ=${TZ}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - n8n_net
+
+  mcp:
+    image: ghcr.io/czlonkowski/n8n-mcp:latest
+    restart: unless-stopped
+    environment:
+      - MCP_MODE=http
+      - PORT=3030
+      - LOG_LEVEL=error
+      # Optional: allow management tools; otherwise omit
+      # - N8N_API_URL=http://n8n:5678
+      # - N8N_API_KEY=your-n8n-api-key
+    ports:
+      - "127.0.0.1:3030:3030"
+    volumes:
+      - mcp_data:/app/data
+    networks:
+      - n8n_net
+
+networks:
+  n8n_net:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  caddy_data:
+  caddy_config:
+  mcp_data:
+

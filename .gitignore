@@ -1,0 +1,20 @@
+# Secrets and environment
+.env
+.env.*
+deploy/digitalocean-n8n/.env
+
+# Dependencies
+node_modules/
+
+# Build / coverage artifacts
+dist/
+coverage/
+build.log
+*.log
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+.cursor/
+
