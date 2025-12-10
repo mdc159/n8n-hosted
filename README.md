@@ -6,6 +6,29 @@ Step-by-step to deploy n8n behind Caddy TLS on `n8n.pimpshizzle.com`, with a loc
 - Domain: `n8n.pimpshizzle.com` pointing via A record to the droplet IP.
 - Ubuntu CPU droplet (e.g., 2 vCPU / 4 GB). Recommended OS: Ubuntu 22.04 LTS (Jammy). 24.04 LTS is fine if you prefer latest, but 22.04 has the broadest Docker/docs support.
 - SSH access as a sudo-capable user.
+- GitHub access: prefer SSH deploy key on the droplet so it can `git pull`/`git push` to `mdc159/n8n-hosted` without PATs.
+
+### Set up droplet deploy key (SSH)
+On the droplet (root):
+```bash
+ssh-keygen -t ed25519 -C "droplet-n8n" -f ~/.ssh/id_ed25519_n8n -N ""
+install -d -m 700 ~/.ssh
+cat > ~/.ssh/config <<'EOF'
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_n8n
+  IdentitiesOnly yes
+EOF
+chmod 600 ~/.ssh/config ~/.ssh/id_ed25519_n8n
+chmod 644 ~/.ssh/id_ed25519_n8n.pub
+cat ~/.ssh/id_ed25519_n8n.pub
+```
+In GitHub → repo → Settings → Deploy keys → Add deploy key → paste the pubkey → enable **Allow write** if you want to push from the droplet. Then verify:
+```bash
+ssh -i ~/.ssh/id_ed25519_n8n -o IdentitiesOnly=yes -T git@github.com
+```
+You should see “successfully authenticated.”
 
 ## 1) Firewall
 ```bash
@@ -24,7 +47,17 @@ sudo usermod -aG docker $USER
 Re-login or `exec su - $USER` to pick up the docker group.
 
 ## 3) Stage deployment files
-Copy these repo root files to `/opt/n8n` on the droplet:
+Clone on the droplet using the deploy key (recommended):
+```bash
+rm -rf /opt/n8n
+GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519_n8n -o IdentitiesOnly=yes' \
+  git clone git@github.com:mdc159/n8n-hosted.git /opt/n8n
+cd /opt/n8n
+```
+
+If you cannot use GitHub from the droplet, you can `scp -r` the repo contents to `/opt/n8n`, but GitHub should remain the source of truth.
+
+Files to have in `/opt/n8n`:
 - `docker-compose.yml`
 - `Caddyfile`
 - `env.example` (copy to `.env` and fill)
