@@ -119,7 +119,7 @@ prepare_dirs() {
   mkdir -p "${DEST_DIR}"
   mkdir -p "${DEST_DIR}/videos"
 
-  rsync -av --delete \
+  rsync -av --delete --exclude 'videos/' --exclude 'docker-compose.override.yml' \
     "${SRC_DIR}/docker-compose.yml" \
     "${SRC_DIR}/Dockerfile.n8n" \
     "${SRC_DIR}/Caddyfile" \
@@ -128,6 +128,9 @@ prepare_dirs() {
     "${SRC_DIR}/claude-code.mcp.json" \
     "${SRC_DIR}/README.md" \
     "${DEST_DIR}/"
+
+  # Ensure videos dir still exists after rsync (excluded above for safety)
+  mkdir -p "${DEST_DIR}/videos"
 
   # Set ownership for videos directory (node user is UID 1000 inside container)
   chown -R 1000:1000 "${DEST_DIR}/videos"
