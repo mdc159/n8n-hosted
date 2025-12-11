@@ -1,7 +1,11 @@
 # Secrets and environment
 .env
-.env.*
+.env.local
 deploy/digitalocean-n8n/.env
+
+# Videos folder (keep .gitkeep, ignore content)
+videos/*
+!videos/.gitkeep
 
 # Dependencies
 node_modules/
