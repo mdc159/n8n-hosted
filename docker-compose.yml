@@ -42,6 +42,7 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - ./videos:/home/node/videos
+      - ./videos:/videos
     networks:
       - n8n_net
 
