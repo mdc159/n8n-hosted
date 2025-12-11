@@ -41,6 +41,22 @@ apt_install() {
   apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin ufw
 }
 
+install_nodejs() {
+  # Check if Node.js is already installed with sufficient version
+  if command -v node &>/dev/null; then
+    local version
+    version=$(node -v | sed 's/v//' | cut -d. -f1)
+    if [[ "${version}" -ge 18 ]]; then
+      echo "Node.js $(node -v) already installed, skipping..."
+      return 0
+    fi
+  fi
+
+  echo "Installing Node.js 20.x LTS..."
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt-get install -y nodejs
+}
+
 setup_firewall() {
   ufw allow 22/tcp
   ufw allow 80/tcp
@@ -73,21 +89,48 @@ prompt_inputs() {
 generate_secrets() {
   N8N_ENCRYPTION_KEY=$(openssl rand -hex 32)
   N8N_USER_MANAGEMENT_JWT_SECRET=$(openssl rand -hex 32)
+  MCP_AUTH_TOKEN=$(openssl rand -hex 32)
 
   # Use caddy container to hash password so caddy binary isn't required on host
   BASIC_AUTH_HASH=$(docker run --rm caddy:2 caddy hash-password --plaintext "${BASIC_AUTH_PASSWORD}")
 }
 
+install_claude_code() {
+  # Check if already installed
+  if command -v claude &>/dev/null; then
+    echo "Claude Code CLI already installed ($(claude --version 2>/dev/null || echo 'unknown version')), skipping..."
+    return 0
+  fi
+
+  echo "Installing Claude Code CLI..."
+  npm install -g @anthropic-ai/claude-code
+
+  # Setup MCP configuration for root user (who runs the bootstrap)
+  local config_dir="/root/.config/Claude"
+  mkdir -p "${config_dir}"
+
+  if [[ -f "${DEST_DIR}/claude-code.mcp.json" ]]; then
+    cp "${DEST_DIR}/claude-code.mcp.json" "${config_dir}/claude_desktop_config.json"
+    echo "MCP config installed to ${config_dir}/claude_desktop_config.json"
+  fi
+}
+
 prepare_dirs() {
   mkdir -p "${DEST_DIR}"
+  mkdir -p "${DEST_DIR}/videos"
+
   rsync -av --delete \
     "${SRC_DIR}/docker-compose.yml" \
+    "${SRC_DIR}/Dockerfile.n8n" \
     "${SRC_DIR}/Caddyfile" \
     "${SRC_DIR}/env.example" \
     "${SRC_DIR}/n8n-stack.service" \
     "${SRC_DIR}/claude-code.mcp.json" \
     "${SRC_DIR}/README.md" \
     "${DEST_DIR}/"
+
+  # Set ownership for videos directory (node user is UID 1000 inside container)
+  chown -R 1000:1000 "${DEST_DIR}/videos"
 }
 
 write_env() {
@@ -117,7 +160,11 @@ N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
 N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
 N8N_LOG_LEVEL=info
 
+# MCP authentication (required for HTTP mode)
+MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+
 # Optional MCP management (if you want MCP to call n8n API)
+# Generate API key from n8n UI: Settings > n8n API > Create API Key
 #N8N_API_URL=http://n8n:5678
 #N8N_API_KEY=
 EOF
@@ -125,7 +172,7 @@ EOF
 
 bring_up_stack() {
   pushd "${DEST_DIR}" >/dev/null
-  docker compose pull
+  docker compose build --pull  # Build custom n8n image and pull latest base images
   docker compose up -d
   popd >/dev/null
 }
@@ -139,6 +186,7 @@ enable_systemd() {
 main() {
   require_root
   apt_install
+  install_nodejs
   setup_firewall
   prompt_inputs
   generate_secrets
@@ -146,11 +194,21 @@ main() {
   write_env
   bring_up_stack
   enable_systemd
+  install_claude_code
 
+  echo ""
+  echo "=========================================="
   echo "Done. Visit: https://${DOMAIN}"
+  echo "=========================================="
   echo "Caddy basic auth user: ${BASIC_AUTH_USER}"
   [[ -n "${N8N_BASIC_AUTH_USER}" ]] && echo "n8n basic auth user: ${N8N_BASIC_AUTH_USER}"
   echo "Env saved to ${DEST_DIR}/.env (backup if existed)."
+  echo ""
+  echo "Claude Code CLI installed. Run 'claude' to start."
+  echo "MCP config: /root/.config/Claude/claude_desktop_config.json"
+  echo ""
+  echo "Videos folder: ${DEST_DIR}/videos"
+  echo "FFmpeg available in n8n container: docker compose exec n8n ffmpeg -version"
 }
 
 main "$@"

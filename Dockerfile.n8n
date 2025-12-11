@@ -1,0 +1,17 @@
+# Custom n8n image with FFmpeg support
+FROM n8nio/n8n:latest
+
+# Switch to root for package installation
+USER root
+
+# Install ffmpeg for video processing workflows
+RUN apk add --no-cache ffmpeg
+
+# Create videos directory with correct ownership
+RUN mkdir -p /home/node/videos && chown -R node:node /home/node/videos
+
+# Switch back to node user for security
+USER node
+
+# Default working directory
+WORKDIR /home/node

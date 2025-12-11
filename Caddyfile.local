@@ -1,0 +1,6 @@
+# Simple Caddyfile for local testing (no TLS, no auth)
+# Used by docker-compose.override.yml
+
+:80 {
+    reverse_proxy n8n:5678
+}
