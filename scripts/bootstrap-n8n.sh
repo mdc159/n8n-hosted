@@ -163,10 +163,11 @@ N8N_LOG_LEVEL=info
 # MCP authentication (required for HTTP mode)
 MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
 
-# Optional MCP management (if you want MCP to call n8n API)
-# Generate API key from n8n UI: Settings > n8n API > Create API Key
-#N8N_API_URL=http://n8n:5678
-#N8N_API_KEY=
+# MCP management tools (enables workflow CRUD via Claude Code CLI)
+# After n8n is running, generate API key from: Settings > n8n API > Create API Key
+# Then uncomment N8N_API_KEY and add your key
+N8N_API_URL=http://n8n:5678
+#N8N_API_KEY=your-n8n-api-key-here
 EOF
 }
 

@@ -124,19 +124,41 @@ docker ps | grep mcp
 # Update claude-code.mcp.json if container name differs from n8n-stack-mcp-1
 ```
 
-### MCP management tools (optional)
-To enable MCP tools that can manage n8n workflows:
+### MCP management tools (enables workflow CRUD operations)
+To enable MCP tools that can create, update, and execute n8n workflows:
 ```bash
-# 1. Log into n8n web UI
+# 1. Log into n8n web UI at https://your-domain or http://localhost:8080
 # 2. Navigate to Settings (gear icon) > n8n API
 # 3. Click "Create API Key"
 # 4. Add to .env:
 echo 'N8N_API_URL=http://n8n:5678' >> /opt/n8n/.env
 echo 'N8N_API_KEY=your-api-key-here' >> /opt/n8n/.env
 
-# 5. Restart stack to apply
-docker compose down && docker compose up -d
+# 5. Restart MCP to apply
+docker compose up -d mcp
 ```
+
+### Testing MCP with Claude Code CLI
+```bash
+# Start Claude Code CLI (uses MCP config from ~/.config/Claude/)
+claude
+
+# Example prompts to test MCP management:
+# "List all n8n workflows"
+# "Create a workflow that uses FFmpeg to check video info"
+# "Activate the FFmpeg Test Workflow"
+# "Execute workflow ID xyz"
+```
+
+### MCP capabilities
+| Feature | Without API Key | With API Key |
+|---------|-----------------|--------------|
+| List workflows | ✅ | ✅ |
+| Search nodes | ✅ | ✅ |
+| Create workflows | ❌ | ✅ |
+| Update workflows | ❌ | ✅ |
+| Activate/deactivate | ❌ | ✅ |
+| Execute workflows | ❌ | ✅ |
 
 ## Important Implementation Details
 
@@ -183,6 +205,7 @@ Generate random secrets:
 ```bash
 openssl rand -hex 32  # For N8N_ENCRYPTION_KEY
 openssl rand -hex 32  # For N8N_USER_MANAGEMENT_JWT_SECRET
+openssl rand -hex 32  # For MCP_AUTH_TOKEN
 ```
 
 Must set in `.env`:
@@ -191,11 +214,15 @@ Must set in `.env`:
 - `WEBHOOK_URL` (https://domain/)
 - `CADDY_EMAIL` (for ACME notifications)
 - `BASIC_AUTH_USER`, `BASIC_AUTH_HASH` (Caddy basic auth credentials)
+- `MCP_AUTH_TOKEN` (32-char random hex, required for MCP HTTP mode)
 - `TZ` (timezone, e.g., UTC)
 
-Optional:
-- `N8N_API_URL`, `N8N_API_KEY` (if using MCP management tools)
-- `N8N_BASIC_AUTH_ACTIVE`, `N8N_BASIC_AUTH_USER`, `N8N_BASIC_AUTH_PASSWORD` (n8n internal auth)
+Optional (for MCP workflow management):
+- `N8N_API_URL=http://n8n:5678` (MCP → n8n API connection)
+- `N8N_API_KEY` (generated from n8n UI: Settings > n8n API)
+
+Optional (n8n internal auth):
+- `N8N_BASIC_AUTH_ACTIVE`, `N8N_BASIC_AUTH_USER`, `N8N_BASIC_AUTH_PASSWORD`
 
 ## Testing and Verification
 

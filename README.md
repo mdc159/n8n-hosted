@@ -1,6 +1,17 @@
 # DigitalOcean n8n + Caddy + n8n-MCP + Claude Code CLI
 
-Step-by-step to deploy n8n behind Caddy TLS on `n8n.pimpshizzle.com`, with a local-only n8n-MCP server and Claude Code CLI pointing to it.
+Archon Project ID=ec84cbfd-4324-46e9-a508-a9c2691ffb5c
+
+Production deployment for n8n with FFmpeg video processing, behind Caddy TLS on `n8n.pimpshizzle.com`, with n8n-MCP server for Claude Code CLI integration.
+
+## Features
+- **n8n** workflow automation with custom Docker image
+- **FFmpeg** for video processing in workflows
+- **Filesystem binary mode** for handling large files
+- **Persistent videos folder** at `/opt/n8n/videos`
+- **Caddy** reverse proxy with automatic HTTPS (Let's Encrypt)
+- **n8n-MCP** server for Claude Code CLI integration
+- **Claude Code CLI** automated installation
 
 ## Prerequisites
 - Domain: `n8n.pimpshizzle.com` pointing via A record to the droplet IP.
@@ -76,26 +87,27 @@ cp env.example .env
 
 ## 4) Fill `.env`
 Required:
-- `N8N_ENCRYPTION_KEY` (random 32 chars)
-- `N8N_USER_MANAGEMENT_JWT_SECRET` (random 32 chars)
+- `N8N_ENCRYPTION_KEY` (random 32 chars): `openssl rand -hex 32`
+- `N8N_USER_MANAGEMENT_JWT_SECRET` (random 32 chars): `openssl rand -hex 32`
+- `MCP_AUTH_TOKEN` (random 32 chars): `openssl rand -hex 32`
 - `N8N_HOST=n8n.pimpshizzle.com`
 - `WEBHOOK_URL=https://n8n.pimpshizzle.com/`
 - `CADDY_EMAIL=you@example.com` (for ACME)
 - `TZ=UTC`
 
-Basic auth (Caddy, option A):
+Basic auth (Caddy):
 - `BASIC_AUTH_USER=admin`
-- Generate hash: `caddy hash-password --plaintext 'YourStrongPassword'`
-- Set `BASIC_AUTH_HASH=<output>`
+- Generate hash: `docker run --rm caddy:2 caddy hash-password --plaintext 'YourStrongPassword'`
+- Set `BASIC_AUTH_HASH=<output>` (use `$$` escaping for `$` chars)
 
-Optional (if you want MCP to manage n8n):
+MCP management (optional - enables workflow CRUD via Claude Code):
 - `N8N_API_URL=http://n8n:5678`
-- `N8N_API_KEY=<n8n API key>`
+- `N8N_API_KEY=<generated from n8n UI: Settings > n8n API>`
 
 ## 5) Bring up the stack
 ```bash
 cd /opt/n8n
-docker compose pull
+docker compose build --pull  # Build custom n8n image with FFmpeg
 docker compose up -d
 ```
 
@@ -149,9 +161,43 @@ git init
 ```
 Keep it separate from runtime volumes (`n8n_data`, `caddy_data`, `caddy_config`, `mcp_data`).
 
-## 13) Smoke test checklist
+## 13) FFmpeg and video operations
+```bash
+# Verify FFmpeg is available in n8n container
+docker compose exec n8n ffmpeg -version
+
+# List files in videos folder (from container)
+docker compose exec n8n ls -la /home/node/videos
+
+# Videos folder is also accessible on host
+ls -la /opt/n8n/videos
+```
+
+## 14) Smoke test checklist
 - `https://n8n.pimpshizzle.com` loads with valid cert and basic auth prompt.
 - Sign in to n8n UI and run a sample workflow.
+- FFmpeg works: `docker compose exec n8n ffmpeg -version`
 - Claude Code CLI can call MCP tools (e.g., `search_nodes`) without errors.
 - Caddy logs show ACME success and no 502s; n8n logs clean.
+
+## 15) MCP capabilities with API key
+
+| Feature | Without API Key | With API Key |
+|---------|-----------------|--------------|
+| List workflows | ✅ | ✅ |
+| Search nodes | ✅ | ✅ |
+| Create workflows | ❌ | ✅ |
+| Update workflows | ❌ | ✅ |
+| Activate/deactivate | ❌ | ✅ |
+| Execute workflows | ❌ | ✅ |
+
+## Local Development
+
+For local testing without TLS:
+```bash
+cp .env.local.example .env
+docker compose build
+docker compose up -d
+# Access at http://localhost:8080
+```
 
