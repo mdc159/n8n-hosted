@@ -115,13 +115,20 @@ GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519_n8n -o IdentitiesOnly=yes' git push
 # Manual installation if needed:
 sudo npm install -g @anthropic-ai/claude-code
 
-# Configure MCP connection (uses docker exec stdio)
+# Configure MCP connection (uses HTTP mode via mcp-remote)
 mkdir -p ~/.config/Claude
 cp /opt/n8n/claude-code.mcp.json ~/.config/Claude/claude_desktop_config.json
 
-# Verify MCP container name matches config
-docker ps | grep mcp
-# Update claude-code.mcp.json if container name differs from n8n-stack-mcp-1
+# Update the auth token in the config file
+sed -i "s/YOUR_MCP_AUTH_TOKEN_HERE/$(grep MCP_AUTH_TOKEN /opt/n8n/.env | cut -d= -f2)/" ~/.config/Claude/claude_desktop_config.json
+
+# Verify MCP server is accessible
+curl -s http://127.0.0.1:3030/health
+# Should return: {"status":"ok",...}
+
+# IMPORTANT: The MCP server runs in HTTP mode (port 3030)
+# Claude Code connects via npx @modelcontextprotocol/mcp-remote
+# Do NOT use docker exec stdio mode - it conflicts with the running HTTP server
 ```
 
 ### MCP management tools (enables workflow CRUD operations)
@@ -134,8 +141,23 @@ To enable MCP tools that can create, update, and execute n8n workflows:
 echo 'N8N_API_URL=http://n8n:5678' >> /opt/n8n/.env
 echo 'N8N_API_KEY=your-api-key-here' >> /opt/n8n/.env
 
-# 5. Restart MCP to apply
-docker compose up -d mcp
+# 5. IMPORTANT: Ensure no system environment variables override .env
+# Check for overrides:
+env | grep N8N_API_URL
+
+# If found, unset them before restarting:
+unset N8N_API_URL N8N_API_KEY
+
+# 6. Recreate MCP container to apply changes
+docker compose stop mcp && docker compose rm -f mcp && docker compose up -d mcp
+
+# 7. Verify configuration is correct
+docker compose exec mcp sh -c 'env | grep N8N'
+# Should show: N8N_API_URL=http://n8n:5678
+
+# 8. Test connectivity between MCP and n8n
+docker compose exec mcp sh -c 'wget -q -O- http://n8n:5678/healthz'
+# Should return: {"status":"ok"}
 ```
 
 ### Testing MCP with Claude Code CLI
@@ -271,6 +293,11 @@ docker compose logs n8n --tail=50
 
 # Test MCP from CLI (if configured)
 # Run Claude Code CLI and verify MCP tools like search_nodes work
+
+# Test MCP management tools (requires API key)
+docker compose exec mcp sh -c 'env | grep N8N'
+# Verify: N8N_API_URL=http://n8n:5678
+# Verify: N8N_API_KEY is set
 ```
 
 ### Common issues
@@ -280,3 +307,5 @@ docker compose logs n8n --tail=50
 - MCP connection fails: Container name mismatch in `claude-code.mcp.json`
 - FFmpeg not found: Custom image not built, run `docker compose build --pull`
 - Videos permission denied: Run `chown -R 1000:1000 /opt/n8n/videos` on host
+- MCP can't reach n8n API: Check `N8N_API_URL=http://n8n:5678` in .env (use internal Docker network, not external domain)
+- Environment variables not updating: System env vars override `.env` file - check `env | grep N8N` and unset any found before recreating containers

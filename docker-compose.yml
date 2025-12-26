@@ -54,6 +54,8 @@ services:
       - PORT=3030
       - LOG_LEVEL=error
       - AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - WEBHOOK_SECURITY_MODE=permissive
+      - N8N_MODE=true
       # MCP management tools (set N8N_API_URL and N8N_API_KEY in .env to enable)
       - N8N_API_URL=${N8N_API_URL:-}
       - N8N_API_KEY=${N8N_API_KEY:-}

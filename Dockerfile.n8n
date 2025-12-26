@@ -5,7 +5,7 @@ FROM n8nio/n8n:latest
 USER root
 
 # Install ffmpeg for video processing workflows
-RUN apk add --no-cache ffmpeg
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 
 # Create videos directory with correct ownership
 RUN mkdir -p /home/node/videos && chown -R node:node /home/node/videos
