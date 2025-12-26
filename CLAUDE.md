@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Quick Commands
+
+| Action | Command |
+|--------|---------|
+| Start stack | `docker compose up -d` |
+| Stop stack | `docker compose down` |
+| View logs | `docker compose logs -f n8n` |
+| Rebuild n8n image | `docker compose build --pull` |
+| MCP health check | `curl -s http://127.0.0.1:3030/health` |
+| Systemd status | `sudo systemctl status n8n-stack` |
+| Restart via systemd | `sudo systemctl restart n8n-stack` |
+| Reload Caddy | `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` |
+
 ## Overview
 
 This repository contains a production deployment configuration for n8n (workflow automation platform) running on DigitalOcean behind Caddy reverse proxy with TLS, plus an n8n-MCP server for Claude Code integration. The stack is designed to run on a single Ubuntu droplet at `/opt/n8n` with systemd service management.
@@ -16,8 +29,8 @@ This repository contains a production deployment configuration for n8n (workflow
 **Key architectural decisions:**
 - n8n is never directly exposed; all traffic goes through Caddy
 - Caddy handles both HTTP->HTTPS redirect and basic auth before reaching n8n
-- MCP server runs in HTTP mode inside Docker but only published to 127.0.0.1:3030
-- Claude Code CLI connects via stdio mode by doing `docker exec` into the running MCP container
+- MCP server runs in HTTP mode inside Docker, published to 127.0.0.1:3030
+- Claude Code CLI connects via `docker exec` with `MCP_MODE=stdio` override (see `claude-code.mcp.json`)
 - Persistent data stored in Docker volumes: `n8n_data`, `caddy_data`, `caddy_config`, `mcp_data`
 - Binary workflow data (large files) stored on filesystem for better performance
 - Videos folder (`/opt/n8n/videos`) mounted for video processing workflows
@@ -63,14 +76,14 @@ docker compose logs -f mcp    # View MCP logs
 
 ### FFmpeg and video operations
 ```bash
-# Verify FFmpeg is available in n8n container
-docker compose exec n8n ffmpeg -version
+# Verify FFmpeg is available in n8n container (use full path - distroless has no shell)
+docker compose run --rm --entrypoint /usr/local/bin/ffmpeg n8n -version
 
-# List files in videos folder
-docker compose exec n8n ls -la /home/node/videos
-
-# Videos folder is also accessible on host at /opt/n8n/videos
+# Videos folder is accessible on host at /opt/n8n/videos
 ls -la /opt/n8n/videos
+
+# Note: n8n 2.0+ uses distroless base image - no shell, ls, or package managers
+# FFmpeg is installed via multi-stage build (see Dockerfile.n8n)
 ```
 
 ### Systemd service
@@ -115,20 +128,20 @@ GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519_n8n -o IdentitiesOnly=yes' git push
 # Manual installation if needed:
 sudo npm install -g @anthropic-ai/claude-code
 
-# Configure MCP connection (uses HTTP mode via mcp-remote)
+# Configure MCP connection (uses docker exec with stdio mode override)
 mkdir -p ~/.config/Claude
 cp /opt/n8n/claude-code.mcp.json ~/.config/Claude/claude_desktop_config.json
 
-# Update the auth token in the config file
-sed -i "s/YOUR_MCP_AUTH_TOKEN_HERE/$(grep MCP_AUTH_TOKEN /opt/n8n/.env | cut -d= -f2)/" ~/.config/Claude/claude_desktop_config.json
+# Verify MCP server container is running
+docker compose ps mcp
 
-# Verify MCP server is accessible
+# Verify MCP server health (HTTP endpoint)
 curl -s http://127.0.0.1:3030/health
 # Should return: {"status":"ok",...}
 
-# IMPORTANT: The MCP server runs in HTTP mode (port 3030)
-# Claude Code connects via npx @modelcontextprotocol/mcp-remote
-# Do NOT use docker exec stdio mode - it conflicts with the running HTTP server
+# NOTE: claude-code.mcp.json uses docker exec with MCP_MODE=stdio
+# This spawns a separate stdio process inside the container
+# The HTTP server (port 3030) continues running independently
 ```
 
 ### MCP management tools (enables workflow CRUD operations)
@@ -202,10 +215,18 @@ claude
 - Caddy auto-provisions Let's Encrypt cert for domain in `N8N_HOST`
 - Webhook URLs use `WEBHOOK_URL=https://domain/`
 
+### n8n distroless base image (v2.0+)
+- n8n 2.0+ uses a distroless base image for security hardening
+- No shell (`sh`, `bash`), no package managers (`apk`, `apt-get`)
+- No standard utilities (`cat`, `ls`, `mkdir`, `chown`)
+- FFmpeg installed via multi-stage build copying static binaries (see `Dockerfile.n8n`)
+- Use `--entrypoint` flag to run binaries: `docker compose run --rm --entrypoint /usr/local/bin/ffmpeg n8n -version`
+
 ### MCP connection modes
-- MCP container runs in `MCP_MODE=http` (listens on port 3030)
-- Claude Code CLI uses `MCP_MODE=stdio` via docker exec into container
-- This allows local-only access without exposing HTTP endpoint publicly
+- MCP container runs with `MCP_MODE=http` by default (listens on port 3030)
+- Claude Code CLI uses `docker exec` with `MCP_MODE=stdio` override to spawn a stdio process
+- Both modes work simultaneously: HTTP for health checks, stdio for Claude Code
+- Port 3030 is bound to 127.0.0.1 only (not publicly accessible)
 
 ### File locations on droplet
 - Stack definition: `/opt/n8n/docker-compose.yml`
@@ -309,3 +330,58 @@ docker compose exec mcp sh -c 'env | grep N8N'
 - Videos permission denied: Run `chown -R 1000:1000 /opt/n8n/videos` on host
 - MCP can't reach n8n API: Check `N8N_API_URL=http://n8n:5678` in .env (use internal Docker network, not external domain)
 - Environment variables not updating: System env vars override `.env` file - check `env | grep N8N` and unset any found before recreating containers
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed debugging logs and workarounds.
+
+## Claude Code Skills
+
+This repository includes specialized skills (`.claude/skills/`) for n8n workflow development:
+
+| Skill | Use When |
+|-------|----------|
+| `n8n-mcp-tools-expert` | Using MCP tools (search_nodes, validate, create/update workflows) |
+| `n8n-expression-syntax` | Writing `{{ }}` expressions, fixing syntax errors |
+| `n8n-node-configuration` | Configuring nodes with operation-specific requirements |
+| `n8n-workflow-patterns` | Building webhook, HTTP API, database, AI agent, or scheduled workflows |
+| `n8n-validation-expert` | Interpreting validation errors, handling false positives |
+| `n8n-code-javascript` | Writing JavaScript in Code nodes (`$input`, `$json`, `$helpers`) |
+| `n8n-code-python` | Writing Python in Code nodes (`_input`, `_json`, standard library) |
+
+Skills are invoked automatically when relevant. Full documentation in each skill's `SKILL.md`.
+
+## MCP Tool Quick Reference
+
+**Node type formats differ by tool category:**
+```
+Search/validate tools:  nodes-base.slack
+Workflow tools:         n8n-nodes-base.slack
+```
+
+**Recommended workflow:**
+1. `search_nodes({query: "keyword"})` → find nodes
+2. `get_node_essentials({nodeType: "nodes-base.X"})` → understand config (NOT get_node_info)
+3. `validate_node_operation({nodeType, config, profile: "runtime"})` → check config
+4. `n8n_create_workflow({name, nodes, connections})` → build
+5. `n8n_update_partial_workflow({id, operations})` → iterate (most common!)
+6. `n8n_validate_workflow({id})` → verify
+
+**Tool reliability:**
+| Tool | Success Rate | Notes |
+|------|--------------|-------|
+| `search_nodes` | 99.9% | Fast, always works |
+| `get_node_essentials` | 91.7% | Use instead of get_node_info |
+| `get_node_info` | 80% | Large payload, use sparingly |
+| `n8n_update_partial_workflow` | 99.0% | Primary editing tool |
+| `n8n_create_workflow` | 96.8% | Requires API key |
+
+**Smart connection parameters:**
+```javascript
+// IF node branches
+{type: "addConnection", source: "IF", target: "Handler", branch: "true"}
+{type: "addConnection", source: "IF", target: "Handler", branch: "false"}
+
+// Switch node cases
+{type: "addConnection", source: "Switch", target: "Handler", case: 0}
+```
+
+See `.claude/skills/n8n-mcp-tools-expert/SKILL.md` for complete documentation.

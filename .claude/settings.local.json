@@ -43,7 +43,11 @@
       "mcp__n8n-mcp__validate_node",
       "mcp__n8n-mcp__n8n_validate_workflow",
       "mcp__n8n-mcp__n8n_executions",
-      "Bash(chown:*)"
+      "Bash(chown:*)",
+      "WebSearch",
+      "Bash(docker image inspect:*)",
+      "Bash(docker inspect:*)",
+      "Bash(docker run:*)"
     ],
     "deny": [],
     "ask": []

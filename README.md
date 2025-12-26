@@ -42,7 +42,46 @@ In GitHub → repo → Settings → Deploy keys → Add deploy key → paste the
 ```bash
 ssh -i ~/.ssh/id_ed25519_n8n -o IdentitiesOnly=yes -T git@github.com
 ```
-You should see “successfully authenticated.”
+You should see "successfully authenticated."
+
+## Deployment Options
+
+### Option 1: Automated Bootstrap (Recommended)
+
+The `scripts/bootstrap-n8n.sh` script automates the entire deployment process. It will:
+
+1. **Install dependencies**: Docker, Docker Compose, Node.js 20.x, UFW firewall
+2. **Configure firewall**: Allow ports 22, 80, 443
+3. **Clone repository**: Copy deployment files to `/opt/n8n`
+4. **Generate secrets**: Create random encryption keys and auth tokens
+5. **Build custom n8n image**: Multi-stage build with FFmpeg support
+6. **Start services**: Launch n8n, Caddy, and MCP server
+7. **Enable systemd**: Auto-start stack on boot
+8. **Install Claude Code CLI**: Global npm installation with MCP config
+
+**Usage:**
+```bash
+# Clone repo to temporary location
+git clone git@github.com:mdc159/n8n-hosted.git ~/n8n-temp
+cd ~/n8n-temp
+
+# Run bootstrap as root
+sudo bash scripts/bootstrap-n8n.sh
+```
+
+The script will interactively prompt for:
+- Domain name (default: n8n.pimpshizzle.com)
+- Admin email for Let's Encrypt
+- Caddy basic auth credentials
+- Optional n8n internal auth credentials
+
+After completion, the deployment will be at `/opt/n8n` with all services running.
+
+### Option 2: Manual Deployment
+
+For manual control or troubleshooting, follow steps 1-15 below.
+
+---
 
 ## 1) Firewall
 ```bash
@@ -163,20 +202,20 @@ Keep it separate from runtime volumes (`n8n_data`, `caddy_data`, `caddy_config`,
 
 ## 13) FFmpeg and video operations
 ```bash
-# Verify FFmpeg is available in n8n container
-docker compose exec n8n ffmpeg -version
+# Verify FFmpeg is available in n8n container (use --entrypoint, distroless has no shell)
+docker compose run --rm --entrypoint /usr/local/bin/ffmpeg n8n -version
 
-# List files in videos folder (from container)
-docker compose exec n8n ls -la /home/node/videos
-
-# Videos folder is also accessible on host
+# Videos folder is accessible on host
 ls -la /opt/n8n/videos
+
+# Note: n8n 2.0+ uses distroless base image (no shell, no package managers)
+# FFmpeg is installed via multi-stage Docker build with static binaries (see Dockerfile.n8n)
 ```
 
 ## 14) Smoke test checklist
 - `https://n8n.pimpshizzle.com` loads with valid cert and basic auth prompt.
 - Sign in to n8n UI and run a sample workflow.
-- FFmpeg works: `docker compose exec n8n ffmpeg -version`
+- FFmpeg works: `docker compose run --rm --entrypoint /usr/local/bin/ffmpeg n8n -version`
 - Claude Code CLI can call MCP tools (e.g., `search_nodes`) without errors.
 - Caddy logs show ACME success and no 502s; n8n logs clean.
 

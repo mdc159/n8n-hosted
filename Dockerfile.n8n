@@ -1,17 +1,21 @@
-# Custom n8n image with FFmpeg support
+# Multi-stage build for FFmpeg support on distroless n8n (v2.0+)
+#
+# The n8n base image transitioned to distroless in v2.0, which means:
+# - No shell (sh, bash)
+# - No package managers (apk, apt-get)
+# - No standard utilities (cat, ls, mkdir, chown)
+#
+# Solution: Use static FFmpeg binaries that work on any Linux system.
+
+# Stage 1: Get static FFmpeg binaries
+FROM mwader/static-ffmpeg:7.1 AS ffmpeg
+
+# Stage 2: Build final n8n image
 FROM n8nio/n8n:latest
 
-# Switch to root for package installation
-USER root
+# Copy FFmpeg binaries (static, no dependencies needed)
+COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
+COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
 
-# Install ffmpeg for video processing workflows
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
-
-# Create videos directory with correct ownership
-RUN mkdir -p /home/node/videos && chown -R node:node /home/node/videos
-
-# Switch back to node user for security
-USER node
-
-# Default working directory
-WORKDIR /home/node
+# Note: Cannot run mkdir/chown in distroless - no shell available
+# Videos directory is created via Docker volume mount in docker-compose.yml

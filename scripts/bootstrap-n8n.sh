@@ -212,7 +212,7 @@ main() {
   echo "MCP config: /root/.config/Claude/claude_desktop_config.json"
   echo ""
   echo "Videos folder: ${DEST_DIR}/videos"
-  echo "FFmpeg available in n8n container: docker compose exec n8n ffmpeg -version"
+  echo "FFmpeg available in n8n container: docker compose run --rm --entrypoint /usr/local/bin/ffmpeg n8n -version"
 }
 
 main "$@"
